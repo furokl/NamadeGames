@@ -12,13 +12,19 @@ class ANG_ThirdPersonCharacter : public ACharacter
 	GENERATED_BODY()
 
 	/** Camera boom positioning the camera behind the character */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
 	class USpringArmComponent* CameraBoom;
 
 	/** Follow camera */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera", meta = (AllowPrivateAccess = "true"))
 	class UCameraComponent* FollowCamera;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", meta = (AllowPrivateAccess = "true"))
+	bool bSprint;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "State", meta = (AllowPrivateAccess = "true"))
+	bool bSit;
+	
 public:
 	ANG_ThirdPersonCharacter();
 
@@ -28,12 +34,20 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Widgets", meta = (BindWidget))
 	TSubclassOf<UUserWidget> SpeedWidget;
-
 	UUserWidget* SpeedWidgetInstance;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FOV")
+	float FOVCurrentValue;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FOV")
+	float FOVTargetValue;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FOV")
+	float InterpolationSpeed;
+	
 private:
 	virtual void BeginPlay() override;
-	bool IsSprint;
+	virtual void Tick(float DeltaSeconds) override;
 	
 protected:
 
@@ -46,7 +60,14 @@ protected:
 	/** Called for sprint input **/
 	void Sprint();
 	void StopSprinting();
+
+	/** Called for sit input **/
+	void Sit();
+	void StopSitting();
 	
+	void OffAllState();
+
+
 	/** 
 	 * Called via input to turn at a given rate. 
 	 * @param Rate	This is a normalized rate, i.e. 1.0 means 100% of desired turn rate

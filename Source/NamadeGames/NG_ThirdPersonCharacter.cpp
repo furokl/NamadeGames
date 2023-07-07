@@ -2,6 +2,7 @@
 
 #include "NG_ThirdPersonCharacter.h"
 
+#include "Camera/CameraShakeBase.h"
 #include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -49,8 +50,11 @@ ANG_ThirdPersonCharacter::ANG_ThirdPersonCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
-	IsSprint = false;
+	bSprint = false;
 
+	FOVCurrentValue = 90.f;
+	FOVTargetValue = 90.f;
+	InterpolationSpeed = 5.0f;
 	// !!! causes the editor to crash
 	//static ConstructorHelpers::FClassFinder<UUserWidget> SpeedWidgetBPClass(TEXT("/Game/Blueprints/WBP_SpeedInfo"));
 	//if (SpeedWidgetBPClass.Class != NULL)
@@ -70,6 +74,14 @@ void ANG_ThirdPersonCharacter::BeginPlay()
 	SpeedWidgetInstance->AddToViewport();  
 }
 
+void ANG_ThirdPersonCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	
+	FOVCurrentValue = FMath::FInterpTo(FOVCurrentValue, FOVTargetValue, GetWorld()->GetDeltaSeconds(), InterpolationSpeed);
+	FollowCamera->SetFieldOfView(FOVCurrentValue);
+}
+
 //////////////////////////////////////////////////////////////////////////
 // Input
 
@@ -79,9 +91,10 @@ void ANG_ThirdPersonCharacter::SetupPlayerInputComponent(class UInputComponent* 
 	check(PlayerInputComponent);
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
-	
 	PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &ANG_ThirdPersonCharacter::Sprint);
 	PlayerInputComponent->BindAction("Sprint", IE_Released, this, &ANG_ThirdPersonCharacter::StopSprinting);
+	PlayerInputComponent->BindAction("Sit", IE_Pressed, this, &ANG_ThirdPersonCharacter::Sit);
+	PlayerInputComponent->BindAction("Sit", IE_Released, this, &ANG_ThirdPersonCharacter::StopSitting);
 
 	PlayerInputComponent->BindAxis("Move Forward / Backward", this, &ANG_ThirdPersonCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("Move Right / Left", this, &ANG_ThirdPersonCharacter::MoveRight);
@@ -112,22 +125,48 @@ void ANG_ThirdPersonCharacter::TouchStopped(ETouchIndex::Type FingerIndex, FVect
 
 void ANG_ThirdPersonCharacter::Sprint()
 {
-	if (!IsSprint)
+	if (!bSprint)
 	{
-		IsSprint = true;
+		OffAllState();
+		bSprint = true;
 		GetCharacterMovement()->MaxWalkSpeed *= 2.f;
-		FollowCamera->SetFieldOfView(120.f);
+		FOVTargetValue = 120.f;
 	}
 }
 
 void ANG_ThirdPersonCharacter::StopSprinting()
 {
-	if (IsSprint)
+	if (bSprint)
 	{
-		IsSprint = false;
+		bSprint = false;
 		GetCharacterMovement()->MaxWalkSpeed /= 2.f;
-		FollowCamera->SetFieldOfView(90.f);
+		FOVTargetValue = 90.f;
 	}
+}
+
+void ANG_ThirdPersonCharacter::Sit()
+{
+	if (!bSit)
+	{
+		OffAllState();
+		bSit = true;
+		GetCharacterMovement()->MaxWalkSpeed /= 2.f;
+	}
+}
+
+void ANG_ThirdPersonCharacter::StopSitting()
+{
+	if (bSit)
+	{
+		bSit = false;
+		GetCharacterMovement()->MaxWalkSpeed *= 2.f;
+	}
+}
+
+void ANG_ThirdPersonCharacter::OffAllState()
+{
+	bSprint = false;
+	bSit = false;
 }
 
 void ANG_ThirdPersonCharacter::TurnAtRate(float Rate)
