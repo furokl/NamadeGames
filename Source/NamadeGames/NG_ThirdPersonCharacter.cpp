@@ -1,6 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "NG_ThirdPersonCharacter.h"
+
+#include "Blueprint/UserWidget.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -47,8 +49,25 @@ ANG_ThirdPersonCharacter::ANG_ThirdPersonCharacter()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); // Attach the camera to the end of the boom and let the boom adjust to match the controller orientation
 	FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
+	IsSprint = false;
+
+	// !!! causes the editor to crash
+	//static ConstructorHelpers::FClassFinder<UUserWidget> SpeedWidgetBPClass(TEXT("/Game/Blueprints/WBP_SpeedInfo"));
+	//if (SpeedWidgetBPClass.Class != NULL)
+	//{
+	//	SpeedWidget = SpeedWidgetBPClass.Class;
+	//}
+	
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+}
+
+void ANG_ThirdPersonCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	SpeedWidgetInstance = CreateWidget<UUserWidget>(GetWorld(), SpeedWidget);
+	SpeedWidgetInstance->AddToViewport();  
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -60,6 +79,9 @@ void ANG_ThirdPersonCharacter::SetupPlayerInputComponent(class UInputComponent* 
 	check(PlayerInputComponent);
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
+	
+	PlayerInputComponent->BindAction("Sprint", IE_Pressed, this, &ANG_ThirdPersonCharacter::Sprint);
+	PlayerInputComponent->BindAction("Sprint", IE_Released, this, &ANG_ThirdPersonCharacter::StopSprinting);
 
 	PlayerInputComponent->BindAxis("Move Forward / Backward", this, &ANG_ThirdPersonCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("Move Right / Left", this, &ANG_ThirdPersonCharacter::MoveRight);
@@ -77,6 +99,7 @@ void ANG_ThirdPersonCharacter::SetupPlayerInputComponent(class UInputComponent* 
 	PlayerInputComponent->BindTouch(IE_Released, this, &ANG_ThirdPersonCharacter::TouchStopped);
 }
 
+
 void ANG_ThirdPersonCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVector Location)
 {
 	Jump();
@@ -85,6 +108,26 @@ void ANG_ThirdPersonCharacter::TouchStarted(ETouchIndex::Type FingerIndex, FVect
 void ANG_ThirdPersonCharacter::TouchStopped(ETouchIndex::Type FingerIndex, FVector Location)
 {
 	StopJumping();
+}
+
+void ANG_ThirdPersonCharacter::Sprint()
+{
+	if (!IsSprint)
+	{
+		IsSprint = true;
+		GetCharacterMovement()->MaxWalkSpeed *= 2.f;
+		FollowCamera->SetFieldOfView(120.f);
+	}
+}
+
+void ANG_ThirdPersonCharacter::StopSprinting()
+{
+	if (IsSprint)
+	{
+		IsSprint = false;
+		GetCharacterMovement()->MaxWalkSpeed /= 2.f;
+		FollowCamera->SetFieldOfView(90.f);
+	}
 }
 
 void ANG_ThirdPersonCharacter::TurnAtRate(float Rate)
@@ -109,6 +152,7 @@ void ANG_ThirdPersonCharacter::MoveForward(float Value)
 
 		// get forward vector
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+
 		AddMovementInput(Direction, Value);
 	}
 }
